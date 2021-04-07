@@ -1,6 +1,7 @@
 #!/bin/bash
 
-set -o pipefail
+set -e
+
 
 if [[ "$2" == "" ]]
 then
@@ -46,20 +47,20 @@ if [[ -e ${samples_byte_range} ]]; then
 fi
 
 # Get uncompressed header up until the sample names, bgzip with default options
-zcat ${vcfgz_path} | awk '$1 ~ /^##/{print} $1 ~ /^#CHROM/{for (i=1; i<=9; i++) { printf("%s\t", $i) }} $1 !~ /^#/{exit 141}' | ${BGZIP} | head -c -28 > ${outfile}
+zcat ${vcfgz_path} | awk '$1 ~ /^##/{print} $1 ~ /^#CHROM/{for (i=1; i<=9; i++) { printf("%s\t", $i) }} $1 !~ /^#/{exit}' | ${BGZIP} | head -c -28 > ${outfile}
 
 # Mark the starting byte range
 lo=`stat -c '%s' ${outfile}`
 let lo++
 
 # Reprint sample ids with 7 digits (with leading zeros if needed) and bgzip with 0-compression
-zcat ${vcfgz_path} | awk '$1 ~ /^#CHROM/{print} $1 ~ /^chr/{exit 0}' | awk '{for (i=10; i<=NF; i++) {printf "%07d%c", $i, (i==NF?"\n":"\t")}}' | ${BGZIP} -l 0 | head -c -28 >> "$outfile"
+zcat ${vcfgz_path} | awk '$1 ~ /^#CHROM/{for (i=10; i<=NF; i++) {printf "%07d%c", $i, (i==NF?"\n":"\t")}} $1 !~ /^#/{exit}' | ${BGZIP} -l 0 | head -c -28 >> ${outfile}
 
 # Mark the ending byte range
 hi=`stat -c '%s' ${outfile}`
 
 # Bgzip the rest of the file
-zcat ${vcfgz_path} | awk '$1 !~ /^#/{print}' | ${BGZIP} -@ `nproc` >> "$outfile"
+zcat ${vcfgz_path} | awk '$1 !~ /^#/{print}' | ${BGZIP} -@ `nproc` >> ${outfile}
 
 # Tabix the output file
 ${TABIX} -p vcf ${outfile}
@@ -115,4 +116,3 @@ else
 fi
 
 rm -f ${MD5_old} ${MD5_new}
-exit 0
